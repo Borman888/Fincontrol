@@ -24,16 +24,31 @@ function localStore(userKey){
 function App(){
   const [session,setSession]=useState(null); const [demo,setDemo]=useState(!supabase); const [loading,setLoading]=useState(true);
   useEffect(()=>{ if('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(()=>{}); },[]);
-  useEffect(()=>{ (async()=>{ if(!supabase){ setLoading(false); return } const {data}=await supabase.auth.getSession(); setSession(data.session); setLoading(false); supabase.auth.onAuthStateChange((_e,s)=>setSession(s)); })(); },[]);
+  useEffect(()=>{ (async()=>{ if(!supabase){ setLoading(false); return } const {data}=await supabase.auth.getSession(); setSession(data.session); setLoading(false); const {data:listener}=supabase.auth.onAuthStateChange((_e,s)=>setSession(s)); return ()=>listener?.subscription?.unsubscribe?.(); })(); },[]);
   if(loading) return <div className="center">Загрузка ФинКонтроль...</div>;
   if(!session && !demo) return <Auth onDemo={()=>setDemo(true)} />;
   return <Dashboard session={session} demo={demo} onExit={async()=>{ if(demo){setDemo(false);return} await supabase.auth.signOut(); }} />;
 }
 
 function Auth({onDemo}){
- const [email,setEmail]=useState(''); const [password,setPassword]=useState(''); const [mode,setMode]=useState('login'); const [msg,setMsg]=useState('');
- async function submit(e){ e.preventDefault(); setMsg(''); const fn = mode==='login' ? supabase.auth.signInWithPassword : supabase.auth.signUp; const {error}=await fn({email,password}); setMsg(error ? error.message : (mode==='login'?'Вход выполнен':'Проверьте почту для подтверждения регистрации')); }
- return <main className="auth"><section className="authCard"><div className="brand"><div className="logo">ФК</div><div><h1>ФинКонтроль</h1><p>Личные финансы без хаоса: доходы, расходы, планы и отчеты.</p></div></div><form onSubmit={submit}><label>Email<input value={email} onChange={e=>setEmail(e.target.value)} type="email" required placeholder="you@mail.ru"/></label><label>Пароль<input value={password} onChange={e=>setPassword(e.target.value)} type="password" required minLength="6" placeholder="минимум 6 символов"/></label><button className="primary">{mode==='login'?'Войти':'Зарегистрироваться'}</button></form><div className="row"><button onClick={()=>setMode(mode==='login'?'signup':'login')} className="ghost">{mode==='login'?'Создать аккаунт':'У меня уже есть аккаунт'}</button><button onClick={onDemo} className="ghost">Демо без Supabase</button></div>{msg&&<p className="message">{msg}</p>}</section></main>
+ const [email,setEmail]=useState(''); const [password,setPassword]=useState(''); const [mode,setMode]=useState('login'); const [msg,setMsg]=useState(''); const [busy,setBusy]=useState(false);
+ async function submit(e){
+   e.preventDefault(); setMsg(''); setBusy(true);
+   try{
+     if(!supabase){ setMsg('Supabase не подключен. Используйте демо-режим или добавьте переменные VITE_SUPABASE_URL и VITE_SUPABASE_ANON_KEY в Vercel.'); return; }
+     if(mode==='login'){
+       const {error}=await supabase.auth.signInWithPassword({email:email.trim(),password});
+       setMsg(error ? 'Ошибка входа: '+error.message : 'Вход выполнен');
+     } else {
+       const {data,error}=await supabase.auth.signUp({email:email.trim(),password,options:{emailRedirectTo:window.location.origin}});
+       if(error) setMsg('Ошибка регистрации: '+error.message);
+       else if(data?.session) setMsg('Аккаунт создан, вход выполнен.');
+       else setMsg('Аккаунт создан. Если включено подтверждение почты, откройте письмо от Supabase и подтвердите email.');
+     }
+   }catch(err){ setMsg('Техническая ошибка: '+(err?.message||String(err))); }
+   finally{ setBusy(false); }
+ }
+ return <main className="auth"><section className="authCard"><div className="brand"><div className="logo">ФК</div><div><h1>ФинКонтроль</h1><p>Личные финансы без хаоса: доходы, расходы, планы и отчеты.</p></div></div><form onSubmit={submit}><label>Email<input value={email} onChange={e=>setEmail(e.target.value)} type="email" required placeholder="you@mail.ru"/></label><label>Пароль<input value={password} onChange={e=>setPassword(e.target.value)} type="password" required minLength="6" placeholder="минимум 6 символов"/></label><button disabled={busy} className="primary">{busy?'Подождите...':(mode==='login'?'Войти':'Зарегистрироваться')}</button></form><div className="row"><button onClick={()=>{setMsg('');setMode(mode==='login'?'signup':'login')}} className="ghost">{mode==='login'?'Создать аккаунт':'У меня уже есть аккаунт'}</button><button onClick={onDemo} className="ghost">Демо без Supabase</button></div>{msg&&<p className="message">{msg}</p>}</section></main>
 }
 
 function Dashboard({session,demo,onExit}){
