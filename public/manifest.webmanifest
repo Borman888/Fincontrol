@@ -1,0 +1,10 @@
+{
+  "name":"ФинКонтроль",
+  "short_name":"ФинКонтроль",
+  "description":"Учет личных доходов, расходов, планов и отчетов",
+  "start_url":"/",
+  "display":"standalone",
+  "background_color":"#f4f7fb",
+  "theme_color":"#111827",
+  "icons":[]
+}
