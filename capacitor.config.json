@@ -1,0 +1,6 @@
+{
+  "appId": "ru.fincontrol.app",
+  "appName": "ФинКонтроль",
+  "webDir": "dist",
+  "server": { "androidScheme": "https" }
+}
